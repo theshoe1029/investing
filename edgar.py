@@ -28,8 +28,8 @@ BASE_GAAP_TAGS = {
     'us-gaap:interestexpense': 'Interest Expense',
     'us-gaap:othernonoperatingincomeexpense': 'Other Income (Expense) Net',
     'us-gaap:nonoperatingincomeexpense': 'Total Non-Operating Income (Expense)',
-    'us-gaap:incomelossfromcontinuingoperationsbeforeincometaxesminorityinterestandincomelossfromequityme': 'Income (loss) before taxes',
-    'us-gaap:incometaxexpensebenefit': 'Benefit (provision) for income taxes',
+    'us-gaap:incomelossfromcontinuingoperationsbeforeincometaxesminorityinterestandincomelossfromequityme': 'Pretax Income',
+    'us-gaap:incometaxexpensebenefit': 'Taxes',
     'us-gaap:incomelossfromequitymethodinvestments': 'Equity-method investment activity, net of tax',
     'us-gaap:netincomeloss': 'Net income',
 }
@@ -85,7 +85,7 @@ def save_meta_links(meta_file_name: str, soup: BeautifulSoup) -> None:
             f.write(doc.find('text').text.strip())
     f.close()
 
-def get_docs(tkr: str, n_quarters: int, doc_types: list[str]) -> None:
+def get_docs(tkr: str, n_quarters: int, doc_types: list) -> None:
     res = requests.get('https://www.sec.gov/include/ticker.txt', headers={'User-Agent': 'b2g'})
     tkr_to_cik = {l.split('\t')[0]: l.split('\t')[1] for l in res.text.split('\n')}
     cik = tkr_to_cik[tkr]
@@ -98,7 +98,7 @@ def get_docs(tkr: str, n_quarters: int, doc_types: list[str]) -> None:
         link = row.find('a', href=True)['href']
         updated_date = datetime.strptime(row.find_all('td')[-1].contents[0], '%Y-%m-%d %H:%M:%S')
         delta = datetime.today()-updated_date
-        if delta.days < n_quarters*90:
+        if delta.days < n_quarters*120:
             links.append(link)
 
     for link in links:
@@ -114,12 +114,12 @@ def get_docs(tkr: str, n_quarters: int, doc_types: list[str]) -> None:
         if doc_type in doc_types:
             res = requests.get(f"https://www.sec.gov{link}/{file_name}.txt", headers={'User-Agent': 'b2g'})
             soup = BeautifulSoup(res.content, 'lxml')
-
-            print(f"storing {doc_type} doc: {file_name}")
+            
             qtr_folder = str(pd.Series(datetime.strptime(report_period, '%Y%m%d')).dt.to_period('Q')[0])
             if qtr_folder not in os.listdir(doc_dir):
+                print(f"storing {doc_type} doc: {file_name}")
                 os.makedirs(f"{doc_dir}/{qtr_folder}")
-            meta_file_name = f"{doc_dir}/{qtr_folder}/MetaLinks.json"
-            save_meta_links(meta_file_name, soup)
-            xbrl_file_name = f"{doc_dir}/{qtr_folder}/ReportData.xml"
-            save_xbrl(xbrl_file_name, soup)
+                meta_file_name = f"{doc_dir}/{qtr_folder}/MetaLinks.json"
+                save_meta_links(meta_file_name, soup)
+                xbrl_file_name = f"{doc_dir}/{qtr_folder}/ReportData.xml"
+                save_xbrl(xbrl_file_name, soup)
