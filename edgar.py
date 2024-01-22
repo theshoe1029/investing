@@ -53,7 +53,7 @@ def get_context_ref_by_name(file_name: str, name: str) -> str:
     return None
 
 def npv(cash_flow: pd.Series, discount_rate: float) -> int:
-    return sum([c/((1+discount_rate)**t) for t, c in enumerate(cash_flow[1:])])-cash_flow[0]
+    return sum([c/((1+discount_rate)**(t+1)) for t, c in enumerate(cash_flow)])
 
 def get_report_data_by_ref(file_name: str, context_ref: str, unique_tags: dict) -> dict:
     f = open(file_name)
