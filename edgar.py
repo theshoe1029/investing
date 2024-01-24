@@ -1,13 +1,63 @@
 import pandas as pd
 from bs4 import BeautifulSoup
 
+from collections import defaultdict
 from datetime import datetime
 import json
 import os
-import re
 import requests
 
+REQUIRED_COLS = ['Revenue', 'COGS', 'Taxes', 'Shares', 'EPS', 
+                 'Operating Income', 'Pretax Income', 'Income']
+
+US_GAAP_TAGS = {
+    'Revenue': [
+        'SalesRevenueNet',
+        'RevenueFromContractWithCustomerExcludingAssessedTax',
+        'OtherIncome'
+    ],
+    'COGS': [
+        'CostOfRevenue',        
+        'CostOfGoodsAndServicesSold'
+    ],
+    'SG&A': [
+        'SellingGeneralAndAdministrativeExpense'
+    ],
+    'Gross Profit': [
+        'GrossProfit'
+    ],
+    'Operating Expenses': [
+        'OperatingExpenses',
+        'CostsAndExpenses'
+    ],
+    'Taxes': [
+        'IncomeTaxExpenseBenefit'
+    ],
+    'Other Income Loss': [
+        'NetIncomeLossAttributableToNoncontrollingInterest'
+    ],
+    'Shares': [
+        'WeightedAverageNumberOfDilutedSharesOutstanding'
+    ],
+    'EPS': [
+        'EarningsPerShareDiluted'
+    ],
+    'Operating Income': [
+        'ProfitLoss',
+        'OperatingIncomeLoss'
+    ],
+    'Pretax Income': [
+        'IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest',
+        'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments'
+    ],
+    'Income': [
+        'NetIncomeLoss'
+    ]
+}
+
 BASE_GAAP_TAGS = {
+    'us-gaap:Revenues'.lower(): 'Revenue',
+    'us-gaap:SalesRevenueNet'.lower(): 'Revenue',
     'us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax'.lower(): 'Revenue',
     'us-gaap:CostOfGoodsAndServicesSold'.lower(): 'COGS',
     'us-gaap:GrossProfit'.lower(): 'Gross Profit',
@@ -40,6 +90,9 @@ def convert_decimal(tag: BeautifulSoup) -> float:
         return float(tag.text)
     else:
         return int(int(tag.text)*pow(10, n_decimal))
+    
+def npv(cash_flow: pd.Series, discount_rate: float) -> int:
+    return sum([c/((1+discount_rate)**(t+1)) for t, c in enumerate(cash_flow)])
 
 def get_context_ref_by_name(file_name: str, name: str) -> str:
     f = open(file_name)
@@ -51,9 +104,6 @@ def get_context_ref_by_name(file_name: str, name: str) -> str:
             if reports[report_id]['shortName'].lower() == name.lower():
                 return reports[report_id]['uniqueAnchor']['contextRef']
     return None
-
-def npv(cash_flow: pd.Series, discount_rate: float) -> int:
-    return sum([c/((1+discount_rate)**(t+1)) for t, c in enumerate(cash_flow)])
 
 def get_report_data_by_ref(file_name: str, context_ref: str, unique_tags: dict) -> dict:
     f = open(file_name)
@@ -85,10 +135,37 @@ def save_meta_links(meta_file_name: str, soup: BeautifulSoup) -> None:
             f.write(doc.find('text').text.strip())
     f.close()
 
-def get_docs(tkr: str, n_quarters: int, doc_types: list) -> None:
+def get_cik(tkr: str) -> str:
     res = requests.get('https://www.sec.gov/include/ticker.txt', headers={'User-Agent': 'b2g'})
     tkr_to_cik = {l.split('\t')[0]: l.split('\t')[1] for l in res.text.split('\n')}
-    cik = tkr_to_cik[tkr]
+    return tkr_to_cik[tkr]
+
+def get_company_facts(tkr: str) -> pd.DataFrame:
+    cik = get_cik(tkr)
+    cik_param = ''.join(['0']*(10-len(cik)))+cik
+    res = requests.get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_param}.json", headers={'User-Agent': 'b2g'})
+    json_content = json.loads(res.content)
+    gaap_content = json_content['facts']['us-gaap']
+    data = {}
+    for col in US_GAAP_TAGS:
+        for tag in US_GAAP_TAGS[col]:
+            if tag in gaap_content:
+                supported_units = ['USD', 'shares', 'USD/shares']
+                for unit in supported_units:
+                    if unit in gaap_content[tag]['units']:
+                        for entry in gaap_content[tag]['units'][unit]:                            
+                            if 'frame' in entry:
+                                frame = entry['frame']
+                                if frame not in data:
+                                    data[frame] = {col: entry['val']}
+                                elif col in data[frame]:
+                                    data[frame][col] += entry['val']
+                                else:
+                                    data[frame][col] = entry['val']
+    return pd.DataFrame(data=data)
+
+def get_docs(tkr: str, n_quarters: int, doc_types: list) -> None:
+    cik = get_cik(tkr)
     print(f"got cik {cik} for ticker {tkr}")
 
     res = requests.get(f"https://www.sec.gov/Archives/edgar/data/{cik}", headers={'User-Agent': 'b2g'})
