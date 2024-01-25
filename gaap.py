@@ -1,12 +1,19 @@
 US_GAAP_TAGS = {
     'Revenue': [
+        'Revenues',
         'SalesRevenueNet',
         'RevenueFromContractWithCustomerExcludingAssessedTax',
         'OtherIncome'
     ],
     'COGS': [
         'CostOfRevenue',
-        'CostOfGoodsAndServicesSold'
+        'CostOfGoodsAndServicesSold',
+        'CostOfGoodsSold',
+        'CostOfGoodsAndServiceExcludingDepreciationDepletionAndAmortization',
+        'FuelCosts1',
+        'MerchandiseCosts',
+        'StoreOperatingExpenses',
+        'CostOfSalesAndRelatedBuyingAndOccupancyCosts'
     ],
     'SG&A': [
         'SellingGeneralAndAdministrativeExpense'
