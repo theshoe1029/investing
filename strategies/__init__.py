@@ -1,0 +1,1 @@
+from .TrendReversal import TrendReversal
