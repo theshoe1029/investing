@@ -1,4 +1,4 @@
-from gaap import US_GAAP_TAGS
+from data.gaap import US_GAAP_TAGS, BASE_GAAP_TAGS
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -44,35 +44,6 @@ def get_company_facts(tkr: str) -> pd.DataFrame:
                                     data[frame] = defaultdict(int)
                                 data[frame][col] += entry['val']
     return pd.DataFrame(data=data)
-
-BASE_GAAP_TAGS = {
-    'us-gaap:Revenues'.lower(): 'Revenue',
-    'us-gaap:SalesRevenueNet'.lower(): 'Revenue',
-    'us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax'.lower(): 'Revenue',
-    'us-gaap:CostOfGoodsAndServicesSold'.lower(): 'COGS',
-    'us-gaap:GrossProfit'.lower(): 'Gross Profit',
-    'us-gaap:ResearchAndDevelopmentExpense'.lower(): 'R&D',
-    'us-gaap:SellingGeneralAndAdministrativeExpense'.lower(): 'SG&A',
-    'us-gaap:OperatingExpenses'.lower(): 'Operating Expenses',
-    'us-gaap:costsandexpenses': 'Operating Expenses',
-    'us-gaap:NonoperatingIncomeExpense'.lower(): 'Interest Income',
-    'us-gaap:IncomeLossFromContinuingOperationsBeforeIncomeTaxes'.lower(): 'Pretax Income',
-    'us-gaap:IncomeTaxExpenseBenefit'.lower(): 'Taxes',
-    'us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding'.lower(): 'Shares',
-    'us-gaap:EarningsPerShareDiluted'.lower(): 'EPS',
-    'us-gaap:marketingexpense': 'Sales and Marketing',
-    'us-gaap:generalandadministrativeexpense': 'General Administrative',
-    'us-gaap:otheroperatingincomeexpensenet': 'Other Operating Expenses (Income) Net',
-    'us-gaap:operatingincomeloss': 'Operating Income',
-    'us-gaap:investmentincomeinterest': 'Interest Income',
-    'us-gaap:interestexpense': 'Interest Expense',
-    'us-gaap:othernonoperatingincomeexpense': 'Other Income (Expense) Net',
-    'us-gaap:nonoperatingincomeexpense': 'Total Non-Operating Income (Expense)',
-    'us-gaap:incomelossfromcontinuingoperationsbeforeincometaxesminorityinterestandincomelossfromequityme': 'Pretax Income',
-    'us-gaap:incometaxexpensebenefit': 'Taxes',
-    'us-gaap:incomelossfromequitymethodinvestments': 'Equity-method investment activity, net of tax',
-    'us-gaap:netincomeloss': 'Net income',
-}
 
 def get_context_ref_by_name(file_name: str, name: str) -> str:
     f = open(file_name)
