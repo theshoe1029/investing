@@ -1,7 +1,7 @@
 from backtesting import Strategy
 import pandas as pd
 
-from indicators import RMA, RSI
+from common.indicators import RMA, RSI
 
 class TrendReversal(Strategy):
     '''
