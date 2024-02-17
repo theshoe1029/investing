@@ -11,5 +11,12 @@ def norm_pairs(df: pd.DataFrame, col_1: str, col_2: str, days: int = 30) -> pd.S
     return norm_x/norm_y
 
 def flag_outliers(df: pd.DataFrame, col: str, threshold: int) -> pd.Series:
-    return ~df[col].between(df[col].mean()-threshold*df[col].std(),
-                            df[col].mean()+threshold*df[col].std())
+    outliers = []
+    for val in df[col]:
+        if val <= df[col].mean()-threshold*df[col].std():
+            outliers.append(-1)
+        elif val >= df[col].mean()+threshold*df[col].std():
+            outliers.append(1)
+        else:
+            outliers.append(0)
+    return pd.Series(outliers, index=df.index)
