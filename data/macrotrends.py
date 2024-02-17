@@ -30,7 +30,10 @@ def get_financial_statement(tkr: str, company_name: str, statement_type: str) ->
     df = pd.DataFrame(data, dtype='float32').dropna(axis=1)
     return df
 
-def init_model(tkr: str, company_name: str, path: str, to_excel: bool = False) -> None:
+def init_model(tkr: str, company_name: str, path: str = '.', to_excel: bool = False) -> None:
+    '''
+    Create a CSV or Excel file with a combination of a company's income statement, balance sheet, and cash flow statement.
+    '''
     income_statement = get_financial_statement(tkr, company_name, INCOME)
     balance_sheet = get_financial_statement(tkr, company_name, BALANCE_SHEET)
     cash_flow = get_financial_statement(tkr, company_name, CASH_FLOW)
