@@ -1,3 +1,4 @@
+import argparse
 from bs4 import BeautifulSoup
 import pandas as pd
 
@@ -24,8 +25,8 @@ def get_financial_statement(tkr: str, company_name: str, statement_type: str) ->
         row_data = {}
         for k in row.keys():
             if k not in ['field_name', 'popup_icon'] and row[k] != '':
-                year = datetime.strptime(k, '%Y-%m-%d').year
-                row_data[year] = float(row[k])
+                report_date = datetime.strptime(k, '%Y-%m-%d')
+                row_data[report_date] = float(row[k])
         data[row_name] = row_data
     df = pd.DataFrame(data, dtype='float32').dropna(axis=1)
     return df
@@ -44,3 +45,13 @@ def init_model(tkr: str, company_name: str, path: str = '.', to_excel: bool = Fa
         df.to_excel(f'{path}/{tkr}.xlsx', float_format='%.2f', engine='openpyxl')
     else:
         df.to_csv(f'{path}/{tkr}.csv', float_format='%.2f')
+
+def run(args=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ticker', required=True, help='Ticker for pulling data')
+    parser.add_argument('--company_name', required=True, help='Company name from macrotrends URL')
+    args = parser.parse_args(args)
+    init_model(args.ticker, args.company_name)
+
+if __name__ == '__main__':
+    run()
