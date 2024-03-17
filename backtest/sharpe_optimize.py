@@ -1,8 +1,13 @@
+import warnings
+
 import backtrader as bt
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
 import yfinance as yf
+from pyfolio.tears import create_full_tear_sheet
+from scipy.optimize import minimize
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
 class SharpeOptimize(bt.Strategy):
@@ -11,26 +16,37 @@ class SharpeOptimize(bt.Strategy):
 
     def __init__(self):
         self.m_hist = []
-        self.pf = np.array([1/len(self.datas)]*len(self.datas))
+        self.pf = np.array([1 / len(self.datas)] * len(self.datas))
 
     def next(self):
+        buy = []
         self.m_hist.append([self.datas[i][0] for i in range(len(self.datas))])
         if len(self) > 24:
             self.optimize_shrp()
-        for i, w in enumerate(self.pf):
-            stake = self.broker.get_cash()*w//self.datas[i][0]
-            self.buy(self.datas[i], size=stake)
+            for i, w in enumerate(self.pf):
+                curr_stake = self.getposition(self.datas[i], self.broker).size
+                new_stake = self.broker.get_value(self.datas) * w // self.datas[i][0]
+                if new_stake > curr_stake:
+                    buy.append([self.datas[i], new_stake - curr_stake])
+                if new_stake < curr_stake:
+                    self.sell(self.datas[i], size=curr_stake - new_stake)
+            for b in buy:
+                self.buy(b[0], b[1])
 
     def shrp(self, return_rates, w):
         R = np.matmul(return_rates.to_numpy(), w)
-        return np.sqrt(12)*(R.mean()-self._RISK_FREE)/R.std()
+        return np.sqrt(12) * (R.mean() - self._RISK_FREE) / R.std()
 
     def optimize_shrp(self):
         return_rates = pd.DataFrame(self.m_hist).pct_change().dropna()
         w0 = self.pf.copy()
         bounds = [(0, 1) for _ in range(len(w0))]
-        result = minimize(lambda w: -self.shrp(return_rates, w), w0, bounds=bounds, constraints={'type': 'eq', 'fun': lambda x: sum(x)-1})
-        print(-result.fun)
+        result = minimize(
+            lambda w: -self.shrp(return_rates, w),
+            w0,
+            bounds=bounds,
+            constraints={"type": "eq", "fun": lambda x: sum(x) - 1},
+        )
         self.pf = np.array(result.x)
 
 
@@ -54,8 +70,7 @@ def gen_portfolio(tickers, start, interval):
 
 def init_cerebro(data: list[pd.DataFrame]) -> bt.Cerebro:
     cerebro = bt.Cerebro()
-    cerebro.addanalyzer(bt.analyzers.AnnualReturn, _name="anr")
-    cerebro.addanalyzer(bt.analyzers.Returns, _name="r")
+    cerebro.addanalyzer(bt.analyzers.PyFolio, _name="pyfolio")
     for row in data:
         cerebro.adddata(bt.feeds.PandasData(dataname=row))
     return cerebro
@@ -69,11 +84,17 @@ def main():
     cerebro.broker.setcash(100000.0)
     cerebro.addstrategy(SharpeOptimize)
     results = cerebro.run()
-    annual_returns = results[0].analyzers.anr.get_analysis().values()
-    anr100 = list(map(lambda x: x * 100, annual_returns))
-    returns = results[0].analyzers.r.get_analysis()
-    print(f"Returns y/y: {anr100}")
-    print(f"Normalized return %: {returns['rnorm100']}")
+    strat = results[0]
+    pyfoliozer = strat.analyzers.getbyname("pyfolio")
+    returns, positions, transactions, gross_lev = pyfoliozer.get_pf_items()
+    create_full_tear_sheet(
+        returns,
+        positions=positions,
+        transactions=transactions,
+        estimate_intraday=False,
+        live_start_date="2015-01-01",
+    )
+    cerebro.plot()
 
 
 if __name__ == "__main__":
